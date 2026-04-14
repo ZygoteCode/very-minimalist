@@ -1,0 +1,50 @@
+# This file configures the analyzer, which statically analyzes Dart code to
+# check for errors, warnings, and lints.
+#
+# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
+# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
+# invoked from the command line by running `flutter analyze`.
+
+# The following line activates a set of recommended lints for Flutter apps,
+# packages, and plugins designed to encourage good coding practices.
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  # PERFORMANCE & BATTERY OPTIMIZATION RULES
+  # These rules help identify performance issues and battery drains
+  rules:
+    # Prefer const constructors for better performance
+    prefer_const_constructors: true
+    prefer_const_literals_to_create_immutables: true
+    prefer_const_declarations: true
+
+    # Use efficient collection methods
+    prefer_collection_literals: true
+    unnecessary_lambdas: true
+
+    # Performance-conscious patterns
+    avoid_slow_async_io: true
+    close_sinks: true
+
+    # Code quality improvements
+    avoid_print: true  # Prevent debug prints in production
+    unnecessary_statements: true
+
+    # Best practices
+    use_key_in_widget_constructors: true
+    prefer_final_locals: true
+    unnecessary_brace_in_string_interps: true
+
+    # Error handling - CRITICAL for production stability
+    empty_catches: true  # Warn on empty catch blocks
+    avoid_catches_without_on_clauses: false  # Allow catching all errors but log them
+
+    # Null safety
+    unnecessary_null_checks: true
+    unnecessary_null_aware_assignments: true
+
+    # Memory management
+    cancel_subscriptions: true
+
+# Additional information about this file can be found at
+# https://dart.dev/guides/language/analysis-options
