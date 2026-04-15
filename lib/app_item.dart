@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_device_apps/flutter_device_apps.dart';
 
 class AppItem extends StatefulWidget {
@@ -14,6 +15,7 @@ class AppItem extends StatefulWidget {
 class _AppItemState extends State<AppItem> {
   bool _hovered = false;
   bool _pressed = false;
+  static const platform = MethodChannel('lock_channel');
 
   void _setPressed(bool value) {
     if (_pressed != value) {
@@ -43,6 +45,7 @@ class _AppItemState extends State<AppItem> {
         onTapDown: (_) => _setPressed(true),
         onTapUp: (_) => _setPressed(false),
         onTapCancel: () => _setPressed(false),
+        onLongPress: () => _showContextMenu(context),
         onTap: () async {
           try {
             await FlutterDeviceApps.openApp(widget.package);
@@ -77,5 +80,103 @@ class _AppItemState extends State<AppItem> {
         ),
       ),
     );
+  }
+
+  void _showContextMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.6),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.08),
+                blurRadius: 32,
+                spreadRadius: 12,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildMenuItem(
+                icon: Icons.info_outline,
+                label: 'App info',
+                onTap: () {
+                  Navigator.pop(context);
+                  _openAppInfo();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.delete_outline,
+                label: 'Uninstall app',
+                onTap: () {
+                  Navigator.pop(context);
+                  _uninstallApp();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 20),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'SF Pro',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAppInfo() async {
+    try {
+      await platform.invokeMethod('openAppInfo', {
+        'package': widget.package,
+      });
+    } catch (e) {
+      debugPrint('Errore app info: $e');
+    }
+  }
+
+  Future<void> _uninstallApp() async {
+    try {
+      await platform.invokeMethod('uninstallApp', {
+        'package': widget.package,
+      });
+    } catch (e) {
+      debugPrint('Errore uninstall: $e');
+    }
   }
 }

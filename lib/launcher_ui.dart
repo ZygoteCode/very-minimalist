@@ -84,6 +84,37 @@ class _LauncherUiState extends State<LauncherUi> {
 
   static const List<String> _cameraKeywords = ['camera', 'fotocamera', 'cam'];
 
+  static const List<String> _settingsPackageCandidates = [
+    'com.android.settings',
+  ];
+
+  static const List<String> _settingsKeywords = [
+    'settings',
+    'impostazioni',
+    'configurazione',
+    'system settings',
+  ];
+
+  Future<void> _openSettingsApp() async {
+    try {
+      await platform.invokeMethod('openSystemSettings');
+    } catch (e) {
+      final package = _resolveSystemAppPackage(
+        packageCandidates: _settingsPackageCandidates,
+        keywords: _settingsKeywords,
+      );
+
+      if (package != null && package.isNotEmpty) {
+        try {
+          await FlutterDeviceApps.openApp(package);
+          return;
+        } catch (e) {
+          debugPrint('Errore apertura Impostazioni via package ($package): $e');
+        }
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -172,7 +203,7 @@ class _LauncherUiState extends State<LauncherUi> {
   Future<void> _handleAppChange(dynamic event) async {
     try {
       final apps = await FlutterDeviceApps.listApps(
-        includeSystem: false,
+        includeSystem: true,
         onlyLaunchable: true,
         includeIcons: false,
       );
@@ -261,28 +292,40 @@ class _LauncherUiState extends State<LauncherUi> {
     }
   }
 
-  Future<void> _openClockApp() {
-    return _openResolvedSystemApp(
+  Future<void> _openClockApp() async {
+    try {
+      await platform.invokeMethod('openClock');
+    } catch (_) {
+      await _openResolvedSystemApp(
       packageCandidates: _clockPackageCandidates,
       keywords: _clockKeywords,
       debugLabel: 'Orologio',
-    );
+      );
+    }
   }
 
-  Future<void> _openPhoneApp() {
-    return _openResolvedSystemApp(
+  Future<void> _openPhoneApp() async {
+    try {
+      await platform.invokeMethod('openPhone');
+    } catch (_) {
+      await _openResolvedSystemApp(
       packageCandidates: _phonePackageCandidates,
       keywords: _phoneKeywords,
       debugLabel: 'Telefono',
-    );
+      );
+    }
   }
 
-  Future<void> _openCameraApp() {
-    return _openResolvedSystemApp(
+  Future<void> _openCameraApp() async {
+    try {
+      await platform.invokeMethod('openCamera');
+    } catch (_) {
+      await _openResolvedSystemApp(
       packageCandidates: _cameraPackageCandidates,
       keywords: _cameraKeywords,
       debugLabel: 'Fotocamera',
-    );
+      );
+    }
   }
 
   List<dynamic> get _filteredApps {
@@ -484,6 +527,7 @@ class _LauncherUiState extends State<LauncherUi> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _buildCircleIcon(Icons.phone, onTap: _openPhoneApp),
+          _buildCircleIcon(Icons.settings, onTap: _openSettingsApp),
           _buildCircleIcon(Icons.camera_alt, onTap: _openCameraApp),
         ],
       ),
