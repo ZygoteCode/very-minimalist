@@ -68,6 +68,7 @@ class _AppItemState extends State<AppItem> {
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
+                    fontFamily: 'SF Pro',
                   ),
                 ),
               ),

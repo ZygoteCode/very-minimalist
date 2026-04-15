@@ -121,7 +121,6 @@ class _LauncherUiState extends State<LauncherUi> {
       final visibleApps = results[0];
       final launchableSystemApps = results[1];
 
-      // 🔥 FILTER SELF APP HERE (CORE FIX)
       final filteredVisibleApps = visibleApps.where((app) {
         final package = _normalize((app.packageName ?? '').toString());
         return package != _normalize(_myPackage);
@@ -172,7 +171,6 @@ class _LauncherUiState extends State<LauncherUi> {
 
   Future<void> _handleAppChange(dynamic event) async {
     try {
-      // 🔥 semplicissimo ma efficace: refresh completo
       final apps = await FlutterDeviceApps.listApps(
         includeSystem: false,
         onlyLaunchable: true,
@@ -400,6 +398,8 @@ class _LauncherUiState extends State<LauncherUi> {
           hintStyle: TextStyle(
             color: Colors.white.withValues(alpha: 0.45),
             fontSize: 14,
+            fontFamily: 'SF Pro',
+            fontWeight: FontWeight.w500,
           ),
           prefixIcon: Icon(
             Icons.search,
