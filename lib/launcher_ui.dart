@@ -30,6 +30,7 @@ class _LauncherUiState extends State<LauncherUi> {
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  static const platform = MethodChannel('lock_channel');
 
   static const List<String> _clockPackageCandidates = [
     'com.google.android.deskclock',
@@ -537,8 +538,6 @@ class _LauncherUiState extends State<LauncherUi> {
   Widget _buildCircleIcon(IconData icon, {VoidCallback? onTap}) {
     return CircleIconButton(icon: icon, onTap: onTap);
   }
-
-  static const platform = MethodChannel('lock_channel');
 
   Future<void> openLock() async {
     try {
