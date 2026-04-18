@@ -14,41 +14,47 @@ class _CircleIconButtonState extends State<CircleIconButton> {
   bool _hovered = false;
   bool _pressed = false;
 
+  static const Color _pressedColor = Color(0x2EFFFFFF);
+  static const Color _hoverColor = Color(0x14FFFFFF);
+  static const Color _normalColor = Colors.black;
+  static const Color _borderColor = Color(0x99FFFFFF);
+  static const Color _shadowColor = Color(0x1AFFFFFF);
+
+  // Ottimizzazione: Durata e Curve costanti per fluidità 120fps
+  static const Duration _animationDuration = Duration(milliseconds: 120);
+
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: _pressed
-                ? Colors.white.withValues(alpha: 0.18)
-                : _hovered
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.6),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.1),
-                blurRadius: 32,
-                spreadRadius: 8,
+    return RepaintBoundary(
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: _animationDuration,
+            curve: Curves.easeOut,
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: _pressed
+                  ? _pressedColor
+                  : _hovered
+                  ? _hoverColor
+                  : _normalColor,
+              shape: BoxShape.circle,
+              border: const Border.fromBorderSide(
+                BorderSide(color: _borderColor, width: 2),
               ),
-            ],
+              boxShadow: const [
+                BoxShadow(color: _shadowColor, blurRadius: 32, spreadRadius: 8),
+              ],
+            ),
+            child: Icon(widget.icon, color: Colors.white, size: 28),
           ),
-          child: Icon(widget.icon, color: Colors.white, size: 28),
         ),
       ),
     );

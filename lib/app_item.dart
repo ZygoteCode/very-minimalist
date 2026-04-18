@@ -17,6 +17,30 @@ class _AppItemState extends State<AppItem> {
   bool _pressed = false;
   static const platform = MethodChannel('lock_channel');
 
+  static const Color _pressedColor = Color(0x2EFFFFFF);
+  static const Color _hoverColor = Color(0x14FFFFFF);
+  static const Color _transparent = Colors.transparent;
+  static const Color _borderColor = Color(0x99FFFFFF);
+  static const Color _shadowColor = Color(0x14FFFFFF);
+  static const Color _iconColor = Color(0xCCFFFFFF);
+
+  static const EdgeInsets _itemMargin = EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 6,
+  );
+  static const EdgeInsets _itemPadding = EdgeInsets.symmetric(
+    horizontal: 16,
+    vertical: 14,
+  );
+  static const Duration _animDuration = Duration(milliseconds: 120);
+
+  static const TextStyle _textStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    fontFamily: 'SF Pro',
+  );
+
   void _setPressed(bool value) {
     if (_pressed != value) {
       setState(() => _pressed = value);
@@ -31,51 +55,48 @@ class _AppItemState extends State<AppItem> {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = _pressed
-        ? Colors.white.withValues(alpha: 0.18)
-        : _hovered
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.transparent;
-
-    return MouseRegion(
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => _setPressed(true),
-        onTapUp: (_) => _setPressed(false),
-        onTapCancel: () => _setPressed(false),
-        onLongPress: () => _showContextMenu(context),
-        onTap: () async {
-          try {
-            await FlutterDeviceApps.openApp(widget.package);
-          } catch (e) {
-            debugPrint('Errore apertura app: $e');
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'SF Pro',
+    return RepaintBoundary(
+      child: MouseRegion(
+        onEnter: (_) => _setHovered(true),
+        onExit: (_) => _setHovered(false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => _setPressed(true),
+          onTapUp: (_) => _setPressed(false),
+          onTapCancel: () => _setPressed(false),
+          onLongPress: () => _showContextMenu(context),
+          onTap: () async {
+            try {
+              await FlutterDeviceApps.openApp(widget.package);
+            } catch (e) {
+              debugPrint('Error while opening app: $e');
+            }
+          },
+          child: AnimatedContainer(
+            duration: _animDuration,
+            curve: Curves.easeOut,
+            margin: _itemMargin,
+            padding: _itemPadding,
+            decoration: BoxDecoration(
+              color: _pressed
+                  ? _pressedColor
+                  : _hovered
+                  ? _hoverColor
+                  : _transparent,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.name,
+                    style: _textStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -86,45 +107,47 @@ class _AppItemState extends State<AppItem> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      elevation: 0,
       builder: (_) {
-        return Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.6),
-              width: 2,
+        return RepaintBoundary(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(24),
+              border: const Border.fromBorderSide(
+                BorderSide(color: _borderColor, width: 2),
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: _shadowColor,
+                  blurRadius: 32,
+                  spreadRadius: 12,
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.08),
-                blurRadius: 32,
-                spreadRadius: 12,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildMenuItem(
-                icon: Icons.info_outline,
-                label: 'App info',
-                onTap: () {
-                  Navigator.pop(context);
-                  _openAppInfo();
-                },
-              ),
-              _buildMenuItem(
-                icon: Icons.delete_outline,
-                label: 'Uninstall app',
-                onTap: () {
-                  Navigator.pop(context);
-                  _uninstallApp();
-                },
-              ),
-            ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildMenuItem(
+                  icon: Icons.info_outline,
+                  label: 'App info',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openAppInfo();
+                  },
+                ),
+                _buildMenuItem(
+                  icon: Icons.delete_outline,
+                  label: 'Uninstall app',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _uninstallApp();
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -143,17 +166,9 @@ class _AppItemState extends State<AppItem> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 20),
+            Icon(icon, color: _iconColor, size: 20),
             const SizedBox(width: 16),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                fontFamily: 'SF Pro',
-              ),
-            ),
+            Text(label, style: _textStyle),
           ],
         ),
       ),
@@ -162,21 +177,17 @@ class _AppItemState extends State<AppItem> {
 
   Future<void> _openAppInfo() async {
     try {
-      await platform.invokeMethod('openAppInfo', {
-        'package': widget.package,
-      });
+      await platform.invokeMethod('openAppInfo', {'package': widget.package});
     } catch (e) {
-      debugPrint('Errore app info: $e');
+      debugPrint('Error while getting app info: $e');
     }
   }
 
   Future<void> _uninstallApp() async {
     try {
-      await platform.invokeMethod('uninstallApp', {
-        'package': widget.package,
-      });
+      await platform.invokeMethod('uninstallApp', {'package': widget.package});
     } catch (e) {
-      debugPrint('Errore uninstall: $e');
+      debugPrint('Error while trying to uninstall app: $e');
     }
   }
 }

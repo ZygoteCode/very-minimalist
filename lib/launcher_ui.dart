@@ -8,6 +8,16 @@ import 'app_item.dart';
 import 'circle_icon_button.dart';
 import 'noglow_scroll_behavior.dart';
 
+class _AppCacheItem {
+  final AppInfo app;
+  final String normalizedName;
+  final String normalizedPackage;
+
+  _AppCacheItem(this.app)
+    : normalizedName = (app.appName).toString().trim().toLowerCase(),
+      normalizedPackage = (app.packageName).toString().trim().toLowerCase();
+}
+
 class LauncherUi extends StatefulWidget {
   const LauncherUi({super.key});
 
@@ -19,11 +29,12 @@ class _LauncherUiState extends State<LauncherUi> {
   late final Timer _timer;
   late final ScrollController _appScrollController;
 
-  String _timeString = '';
+  final ValueNotifier<String> _timeNotifier = ValueNotifier<String>('');
 
-  List<dynamic> _apps = [];
-  List<dynamic> _launchableSystemApps = [];
-  Map<String, dynamic> _launchableSystemAppsByPackage = {};
+  List<_AppCacheItem> _apps = [];
+  List<_AppCacheItem> _filteredAppsCache = [];
+  Map<String, AppInfo> _systemAppsByPackage = {};
+
   bool _loadingApps = true;
   late String _myPackage;
   StreamSubscription? _appChangesSub;
@@ -110,7 +121,7 @@ class _LauncherUiState extends State<LauncherUi> {
           await FlutterDeviceApps.openApp(package);
           return;
         } catch (e) {
-          debugPrint('Errore apertura Impostazioni via package ($package): $e');
+          debugPrint('Error opening Settings via package ($package): $e');
         }
       }
     }
@@ -122,12 +133,7 @@ class _LauncherUiState extends State<LauncherUi> {
         'com.google.android.apps.walletnfcrel',
         'com.google.android.apps.nbu.paisa.user',
       ],
-      keywords: [
-        'wallet',
-        'pay',
-        'google pay',
-        'google wallet',
-      ],
+      keywords: ['wallet', 'pay', 'google pay', 'google wallet'],
       debugLabel: 'Wallet',
     );
   }
@@ -154,58 +160,46 @@ class _LauncherUiState extends State<LauncherUi> {
 
       _appChangesSub = FlutterDeviceApps.appChanges.listen(_handleAppChange);
 
-      final results = await Future.wait([
-        FlutterDeviceApps.listApps(
-          includeSystem: true,
-          onlyLaunchable: true,
-          includeIcons: false,
-        ),
-        FlutterDeviceApps.listApps(
-          includeSystem: true,
-          onlyLaunchable: true,
-          includeIcons: false,
-        ),
-      ]);
+      final allApps = await FlutterDeviceApps.listApps(
+        includeSystem: true,
+        onlyLaunchable: true,
+        includeIcons: false,
+      );
 
-      final visibleApps = results[0];
-      final launchableSystemApps = results[1];
-
-      final filteredVisibleApps = visibleApps.where((app) {
-        final package = _normalize((app.packageName ?? '').toString());
-        return package != _normalize(_myPackage);
-      }).toList();
-
-      final filteredSystemApps = launchableSystemApps.where((app) {
-        final package = _normalize((app.packageName ?? '').toString());
-        return package != _normalize(_myPackage);
-      }).toList();
-
-      final sortedVisibleApps = _sortAppsByName(filteredVisibleApps);
-      final sortedSystemApps = _sortAppsByName(filteredSystemApps);
-
-      final byPackage = <String, dynamic>{
-        for (final app in sortedSystemApps)
-          _normalize((app.packageName ?? '').toString()): app,
-      };
-
-      if (!mounted) return;
-
-      setState(() {
-        _apps = sortedVisibleApps;
-        _launchableSystemApps = sortedSystemApps;
-        _launchableSystemAppsByPackage = byPackage;
-        _loadingApps = false;
-      });
+      _processAppsList(allApps.cast<AppInfo>());
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _apps = [];
-        _launchableSystemApps = [];
-        _launchableSystemAppsByPackage = {};
+        _filteredAppsCache = [];
+        _systemAppsByPackage = {};
         _loadingApps = false;
       });
     }
+  }
+
+  void _processAppsList(List<AppInfo> rawApps) {
+    final myPkg = _normalize(_myPackage);
+    final processedApps = <_AppCacheItem>[];
+    final byPackage = <String, AppInfo>{};
+
+    for (final app in rawApps) {
+      final info = _AppCacheItem(app);
+      if (info.normalizedPackage != myPkg) {
+        processedApps.add(info);
+        byPackage[info.normalizedPackage] = app;
+      }
+    }
+
+    processedApps.sort((a, b) => a.normalizedName.compareTo(b.normalizedName));
+
+    if (!mounted) return;
+    setState(() {
+      _apps = processedApps;
+      _filteredAppsCache = _getFilteredApps(_searchQuery);
+      _systemAppsByPackage = byPackage;
+      _loadingApps = false;
+    });
   }
 
   Future<bool> isDefaultLauncher() async {
@@ -213,7 +207,7 @@ class _LauncherUiState extends State<LauncherUi> {
       final result = await platform.invokeMethod('isDefaultLauncher');
       return result == true;
     } catch (e) {
-      debugPrint('Errore check launcher: $e');
+      debugPrint('Checking launcher error: $e');
       return false;
     }
   }
@@ -233,18 +227,30 @@ class _LauncherUiState extends State<LauncherUi> {
         backgroundColor: Colors.black,
         title: const Text(
           'Set as default launcher',
-          style: TextStyle(color: Colors.white, fontFamily: 'SF Pro', fontSize: 16),
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'SF Pro',
+            fontSize: 16,
+          ),
         ),
         content: const Text(
           'To use very minimalist properly, set it as your default launcher.',
-          style: TextStyle(color: Colors.white70, fontFamily: 'SF Pro', fontSize: 14),
+          style: TextStyle(
+            color: Colors.white70,
+            fontFamily: 'SF Pro',
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text(
               'Later',
-              style: TextStyle(color: Colors.white, fontFamily: 'SF Pro', fontSize: 12),
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'SF Pro',
+                fontSize: 12,
+              ),
             ),
           ),
           TextButton(
@@ -254,7 +260,11 @@ class _LauncherUiState extends State<LauncherUi> {
             },
             child: const Text(
               'Set now',
-              style: TextStyle(color: Colors.white, fontFamily: 'SF Pro', fontSize: 12),
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'SF Pro',
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -266,18 +276,8 @@ class _LauncherUiState extends State<LauncherUi> {
     try {
       await platform.invokeMethod('openLauncherSettings');
     } catch (e) {
-      debugPrint('Errore apertura launcher settings: $e');
+      debugPrint('Error while opening launcher settings: $e');
     }
-  }
-
-  List<dynamic> _sortAppsByName(List<dynamic> apps) {
-    final sorted = [...apps];
-    sorted.sort((a, b) {
-      final nameA = _normalize((a.appName ?? '').toString());
-      final nameB = _normalize((b.appName ?? '').toString());
-      return nameA.compareTo(nameB);
-    });
-    return sorted;
   }
 
   Future<void> _handleAppChange(dynamic event) async {
@@ -287,21 +287,9 @@ class _LauncherUiState extends State<LauncherUi> {
         onlyLaunchable: true,
         includeIcons: false,
       );
-
-      final filtered = apps.where((app) {
-        final package = _normalize((app.packageName ?? '').toString());
-        return package != _normalize(_myPackage);
-      }).toList();
-
-      final sortedFiltered = _sortAppsByName(filtered);
-
-      if (!mounted) return;
-
-      setState(() {
-        _apps = sortedFiltered;
-      });
+      _processAppsList(apps.cast<AppInfo>());
     } catch (e) {
-      debugPrint('Errore aggiornamento app list: $e');
+      debugPrint('Error while updating app list: $e');
     }
   }
 
@@ -309,12 +297,11 @@ class _LauncherUiState extends State<LauncherUi> {
     final now = DateTime.now();
     final hours = now.hour.toString().padLeft(2, '0');
     final minutes = now.minute.toString().padLeft(2, '0');
+    final newTimeStr = '$hours:$minutes';
 
-    if (!mounted) return;
-
-    setState(() {
-      _timeString = '$hours:$minutes';
-    });
+    if (_timeNotifier.value != newTimeStr) {
+      _timeNotifier.value = newTimeStr;
+    }
   }
 
   String _normalize(String value) => value.trim().toLowerCase();
@@ -324,26 +311,25 @@ class _LauncherUiState extends State<LauncherUi> {
     required List<String> keywords,
   }) {
     for (final candidate in packageCandidates) {
-      final hit = _launchableSystemAppsByPackage[_normalize(candidate)];
+      final hit = _systemAppsByPackage[_normalize(candidate)];
       if (hit != null) {
-        final package = (hit.packageName ?? candidate).toString();
+        final package = (hit.packageName).toString();
         if (package.isNotEmpty) {
           return package;
         }
       }
     }
 
-    for (final app in _launchableSystemApps) {
-      final name = _normalize((app.appName ?? '').toString());
-      final package = _normalize((app.packageName ?? '').toString());
+    final normalizedKeywords = keywords.map(_normalize).toList();
 
-      final matched = keywords.any((keyword) {
-        final k = _normalize(keyword);
-        return name.contains(k) || package.contains(k);
+    for (final appCache in _apps) {
+      final matched = normalizedKeywords.any((k) {
+        return appCache.normalizedName.contains(k) ||
+            appCache.normalizedPackage.contains(k);
       });
 
       if (matched) {
-        return (app.packageName ?? '').toString();
+        return (appCache.app.packageName).toString();
       }
     }
 
@@ -361,14 +347,14 @@ class _LauncherUiState extends State<LauncherUi> {
     );
 
     if (package == null || package.isEmpty) {
-      debugPrint('$debugLabel non trovata su questo device.');
+      debugPrint('$debugLabel not found on this device.');
       return;
     }
 
     try {
       await FlutterDeviceApps.openApp(package);
     } catch (e) {
-      debugPrint('Errore apertura $debugLabel ($package): $e');
+      debugPrint('Error while opening $debugLabel ($package): $e');
     }
   }
 
@@ -377,9 +363,9 @@ class _LauncherUiState extends State<LauncherUi> {
       await platform.invokeMethod('openClock');
     } catch (_) {
       await _openResolvedSystemApp(
-      packageCandidates: _clockPackageCandidates,
-      keywords: _clockKeywords,
-      debugLabel: 'Orologio',
+        packageCandidates: _clockPackageCandidates,
+        keywords: _clockKeywords,
+        debugLabel: 'Orologio',
       );
     }
   }
@@ -389,40 +375,46 @@ class _LauncherUiState extends State<LauncherUi> {
       await platform.invokeMethod('openPhone');
     } catch (_) {
       await _openResolvedSystemApp(
-      packageCandidates: _phonePackageCandidates,
-      keywords: _phoneKeywords,
-      debugLabel: 'Telefono',
+        packageCandidates: _phonePackageCandidates,
+        keywords: _phoneKeywords,
+        debugLabel: 'Telefono',
       );
     }
   }
 
   Future<void> _openCameraApp() async {
     try {
-      await platform.invokeMethod('openCamera');
-    } catch (_) {
       await _openResolvedSystemApp(
-      packageCandidates: _cameraPackageCandidates,
-      keywords: _cameraKeywords,
-      debugLabel: 'Fotocamera',
+        packageCandidates: _cameraPackageCandidates,
+        keywords: _cameraKeywords,
+        debugLabel: 'Fotocamera',
       );
+    } catch (_) {
+      await platform.invokeMethod('openCamera');
     }
   }
 
-  List<dynamic> get _filteredApps {
-    final query = _normalize(_searchQuery);
+  void _onSearchChanged(String value) {
+    _searchQuery = value;
+    setState(() {
+      _filteredAppsCache = _getFilteredApps(_searchQuery);
+    });
+  }
 
-    if (query.isEmpty) return _apps;
+  List<_AppCacheItem> _getFilteredApps(String query) {
+    final q = _normalize(query);
+    if (q.isEmpty) return _apps;
 
-    return _apps.where((app) {
-      final name = _normalize((app.appName ?? '').toString());
-      final package = _normalize((app.packageName ?? '').toString());
-      return name.contains(query) || package.contains(query);
+    return _apps.where((appCache) {
+      return appCache.normalizedName.contains(q) ||
+          appCache.normalizedPackage.contains(q);
     }).toList();
   }
 
   @override
   void dispose() {
     _timer.cancel();
+    _timeNotifier.dispose();
     _appScrollController.dispose();
     _appChangesSub?.cancel();
     _searchController.dispose();
@@ -434,8 +426,8 @@ class _LauncherUiState extends State<LauncherUi> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (dipPop, value) async {
-        setState(() => _searchQuery = '');
         _searchController.clear();
+        _onSearchChanged('');
       },
       child: Scaffold(
         backgroundColor: Colors.black,
@@ -456,7 +448,11 @@ class _LauncherUiState extends State<LauncherUi> {
 
                   final clockSize = _clampDouble(width * 0.24, 88, 120);
                   final appBoxWidth = _clampDouble(width * 0.72, 240, 360);
-                  final appBoxHeight = _clampDouble(availableMiddleHeight * 0.50, 240, 420);
+                  final appBoxHeight = _clampDouble(
+                    availableMiddleHeight * 0.50,
+                    240,
+                    420,
+                  );
                   final appBoxTopGap = _clampDouble(height * 0.05, 18, 28);
                   final searchBarWidth = _clampDouble(width * 0.72, 240, 360);
 
@@ -493,68 +489,68 @@ class _LauncherUiState extends State<LauncherUi> {
   }
 
   Widget _buildSearchBar(double width) {
-    return Container(
-      width: width,
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.08),
-            blurRadius: 24,
-            spreadRadius: 8,
+    return RepaintBoundary(
+      child: Container(
+        width: width,
+        height: 52,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.6),
+            width: 2,
           ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) {
-          setState(() => _searchQuery = value);
-        },
-        cursorColor: Colors.white,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.08),
+              blurRadius: 24,
+              spreadRadius: 8,
+            ),
+          ],
         ),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          hintText: 'Search app',
-          hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.45),
+        child: TextField(
+          controller: _searchController,
+          onChanged: _onSearchChanged,
+          cursorColor: Colors.white,
+          style: const TextStyle(
+            color: Colors.white,
             fontSize: 14,
-            fontFamily: 'SF Pro',
             fontWeight: FontWeight.w500,
           ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: Colors.white.withValues(alpha: 0.7),
-            size: 20,
-          ),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-            onPressed: () {
-              _searchController.clear();
-              setState(() => _searchQuery = '');
-            },
-            icon: Icon(
-              Icons.close,
-              color: Colors.white.withValues(alpha: 0.7),
-              size: 18,
+          textAlignVertical: TextAlignVertical.center,
+          decoration: InputDecoration(
+            hintText: 'Search app',
+            hintStyle: TextStyle(
+              color: Colors.white.withValues(alpha: 0.45),
+              fontSize: 14,
+              fontFamily: 'SF Pro',
+              fontWeight: FontWeight.w500,
             ),
-          )
-              : null,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 14,
+            prefixIcon: Icon(
+              Icons.search,
+              color: Colors.white.withValues(alpha: 0.7),
+              size: 20,
+            ),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      _onSearchChanged('');
+                    },
+                    icon: Icon(
+                      Icons.close,
+                      color: Colors.white.withValues(alpha: 0.7),
+                      size: 18,
+                    ),
+                  )
+                : null,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
           ),
         ),
       ),
@@ -562,39 +558,46 @@ class _LauncherUiState extends State<LauncherUi> {
   }
 
   Widget _buildBody(double size) {
-    return Center(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _openClockApp,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.6),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.1),
-                blurRadius: 32,
-                spreadRadius: 16,
+    return RepaintBoundary(
+      child: Center(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _openClockApp,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.6),
+                width: 2,
               ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              _timeString,
-              style: const TextStyle(
-                fontFamily: 'SF Pro',
-                fontSize: 24,
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                decoration: TextDecoration.none,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  blurRadius: 32,
+                  spreadRadius: 16,
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: ValueListenableBuilder<String>(
+                valueListenable: _timeNotifier,
+                builder: (context, timeString, child) {
+                  return Text(
+                    timeString,
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 24,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.none,
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -630,54 +633,60 @@ class _LauncherUiState extends State<LauncherUi> {
     try {
       await platform.invokeMethod('openLock');
     } catch (e) {
-      debugPrint('Errore lock: $e');
+      debugPrint('Error with lock: $e');
     }
   }
 
   Widget _buildAppBox(double width, double height) {
-    final apps = _filteredApps;
-
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.08),
-            blurRadius: 32,
-            spreadRadius: 12,
+    return RepaintBoundary(
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.6),
+            width: 2,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: ScrollConfiguration(
-          behavior: const NoGlowScrollBehavior(),
-          child: Scrollbar(
-            controller: _appScrollController,
-            thumbVisibility: true,
-            thickness: 4,
-            radius: const Radius.circular(20),
-            child: _loadingApps
-                ? const SizedBox.shrink()
-                : ListView.builder(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.08),
+              blurRadius: 32,
+              spreadRadius: 12,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: ScrollConfiguration(
+            behavior: const NoGlowScrollBehavior(),
+            child: Scrollbar(
               controller: _appScrollController,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              itemCount: apps.length,
-              itemBuilder: (context, index) {
-                final app = apps[index];
-                return AppItem(
-                  name: app.appName,
-                  package: app.packageName,
-                );
-              },
+              thumbVisibility: true,
+              thickness: 4,
+              radius: const Radius.circular(20),
+              child: _loadingApps
+                  ? const SizedBox.shrink()
+                  : ListView.builder(
+                      controller: _appScrollController,
+                      physics: const ClampingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      itemCount: _filteredAppsCache.length,
+                      itemBuilder: (context, index) {
+                        final appCache = _filteredAppsCache[index];
+
+                        if (appCache.app.appName != null &&
+                            appCache.app.packageName != null) {
+                          return AppItem(
+                            name: appCache.app.appName!,
+                            package: appCache.app.packageName!,
+                          );
+                        }
+
+                        return Container();
+                      },
+                    ),
             ),
           ),
         ),
