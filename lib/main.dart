@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'launcher_ui.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const LauncherApp());
 }
 

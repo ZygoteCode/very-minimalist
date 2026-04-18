@@ -116,6 +116,22 @@ class _LauncherUiState extends State<LauncherUi> {
     }
   }
 
+  Future<void> _openWalletApp() async {
+    await _openResolvedSystemApp(
+      packageCandidates: [
+        'com.google.android.apps.walletnfcrel',
+        'com.google.android.apps.nbu.paisa.user',
+      ],
+      keywords: [
+        'wallet',
+        'pay',
+        'google pay',
+        'google wallet',
+      ],
+      debugLabel: 'Wallet',
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -132,6 +148,7 @@ class _LauncherUiState extends State<LauncherUi> {
 
   Future<void> _initialize() async {
     try {
+      await _checkLauncherStatus();
       final info = await PackageInfo.fromPlatform();
       _myPackage = info.packageName;
 
@@ -188,6 +205,68 @@ class _LauncherUiState extends State<LauncherUi> {
         _launchableSystemAppsByPackage = {};
         _loadingApps = false;
       });
+    }
+  }
+
+  Future<bool> isDefaultLauncher() async {
+    try {
+      final result = await platform.invokeMethod('isDefaultLauncher');
+      return result == true;
+    } catch (e) {
+      debugPrint('Errore check launcher: $e');
+      return false;
+    }
+  }
+
+  Future<void> _checkLauncherStatus() async {
+    final isDefault = await isDefaultLauncher();
+
+    if (!isDefault) {
+      await _showSetLauncherDialog();
+    }
+  }
+
+  Future<void> _showSetLauncherDialog() async {
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.black,
+        title: const Text(
+          'Set as default launcher',
+          style: TextStyle(color: Colors.white, fontFamily: 'SF Pro', fontSize: 16),
+        ),
+        content: const Text(
+          'To use very minimalist properly, set it as your default launcher.',
+          style: TextStyle(color: Colors.white70, fontFamily: 'SF Pro', fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Later',
+              style: TextStyle(color: Colors.white, fontFamily: 'SF Pro', fontSize: 12),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _openLauncherSettings();
+            },
+            child: const Text(
+              'Set now',
+              style: TextStyle(color: Colors.white, fontFamily: 'SF Pro', fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openLauncherSettings() async {
+    try {
+      await platform.invokeMethod('openLauncherSettings');
+    } catch (e) {
+      debugPrint('Errore apertura launcher settings: $e');
     }
   }
 
@@ -352,53 +431,60 @@ class _LauncherUiState extends State<LauncherUi> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final height = constraints.maxHeight;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (dipPop, value) async {
+        setState(() => _searchQuery = '');
+        _searchController.clear();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final height = constraints.maxHeight;
 
-                final horizontalPadding = width * 0.01;
-                final verticalPadding = height * 0.01;
+                  final horizontalPadding = width * 0.01;
+                  final verticalPadding = height * 0.01;
 
-                final availableMiddleHeight = height - (verticalPadding * 2);
+                  final availableMiddleHeight = height - (verticalPadding * 2);
 
-                final clockSize = _clampDouble(width * 0.24, 88, 120);
-                final appBoxWidth = _clampDouble(width * 0.72, 240, 360);
-                final appBoxHeight = _clampDouble(availableMiddleHeight * 0.50, 240, 420);
-                final appBoxTopGap = _clampDouble(height * 0.05, 18, 28);
-                final searchBarWidth = _clampDouble(width * 0.72, 240, 360);
+                  final clockSize = _clampDouble(width * 0.24, 88, 120);
+                  final appBoxWidth = _clampDouble(width * 0.72, 240, 360);
+                  final appBoxHeight = _clampDouble(availableMiddleHeight * 0.50, 240, 420);
+                  final appBoxTopGap = _clampDouble(height * 0.05, 18, 28);
+                  final searchBarWidth = _clampDouble(width * 0.72, 240, 360);
 
-                return Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: verticalPadding,
-                  ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildBody(clockSize),
-                            SizedBox(height: appBoxTopGap),
-                            _buildSearchBar(searchBarWidth),
-                            const SizedBox(height: 14),
-                            _buildAppBox(appBoxWidth, appBoxHeight),
-                          ],
+                  return Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: verticalPadding,
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildBody(clockSize),
+                              SizedBox(height: appBoxTopGap),
+                              _buildSearchBar(searchBarWidth),
+                              const SizedBox(height: 14),
+                              _buildAppBox(appBoxWidth, appBoxHeight),
+                            ],
+                          ),
                         ),
-                      ),
-                      _buildFooter(),
-                    ],
-                  ),
-                );
-              },
+                        _buildFooter(),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -529,6 +615,7 @@ class _LauncherUiState extends State<LauncherUi> {
         children: [
           _buildCircleIcon(Icons.phone, onTap: _openPhoneApp),
           _buildCircleIcon(Icons.settings, onTap: _openSettingsApp),
+          _buildCircleIcon(Icons.wallet, onTap: _openWalletApp),
           _buildCircleIcon(Icons.camera_alt, onTap: _openCameraApp),
         ],
       ),

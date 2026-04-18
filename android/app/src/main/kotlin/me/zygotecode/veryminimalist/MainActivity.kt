@@ -8,9 +8,22 @@ import android.provider.MediaStore
 import android.provider.AlarmClock
 import android.provider.Settings
 import android.net.Uri
+import android.view.View
+import android.os.Bundle
+import android.content.pm.PackageManager
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "lock_channel"
+
+    override fun onPause() {
+        super.onPause()
+        overridePendingTransition(0, 0)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        overridePendingTransition(0, 0)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -72,6 +85,36 @@ class MainActivity : FlutterActivity() {
                         startActivity(intent)
 
                         result.success(null)
+                    }
+
+                    "isDefaultLauncher" -> {
+                        try {
+                            val intent = Intent(Intent.ACTION_MAIN)
+                            intent.addCategory(Intent.CATEGORY_HOME)
+
+                            val resolveInfo = packageManager.resolveActivity(
+                                intent,
+                                PackageManager.MATCH_DEFAULT_ONLY
+                            )
+
+                            val currentLauncher = resolveInfo?.activityInfo?.packageName
+                            val isDefault = currentLauncher == packageName
+
+                            result.success(isDefault)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+
+                    "openLauncherSettings" -> {
+                        try {
+                            val intent = Intent(Settings.ACTION_HOME_SETTINGS)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
                     }
 
                     else -> result.notImplemented()
