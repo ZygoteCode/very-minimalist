@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_device_apps/flutter_device_apps.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:signals_flutter/signals_flutter.dart';
 
 import 'app_item.dart';
 import 'circle_icon_button.dart';
@@ -14,8 +15,8 @@ class _AppCacheItem {
   final String normalizedPackage;
 
   _AppCacheItem(this.app)
-    : normalizedName = (app.appName).toString().trim().toLowerCase(),
-      normalizedPackage = (app.packageName).toString().trim().toLowerCase();
+      : normalizedName = (app.appName).toString().trim().toLowerCase(),
+        normalizedPackage = (app.packageName).toString().trim().toLowerCase();
 }
 
 class LauncherUi extends StatefulWidget {
@@ -29,18 +30,18 @@ class _LauncherUiState extends State<LauncherUi> {
   late final Timer _timer;
   late final ScrollController _appScrollController;
 
-  final ValueNotifier<String> _timeNotifier = ValueNotifier<String>('');
+  final Signal<String> _timeSignal = signal<String>('');
+  final Signal<List<_AppCacheItem>> _appsSignal = signal<List<_AppCacheItem>>([]);
+  final Signal<bool> _loadingAppsSignal = signal<bool>(true);
+  final Signal<String> _searchQuerySignal = signal<String>('');
 
-  List<_AppCacheItem> _apps = [];
-  List<_AppCacheItem> _filteredAppsCache = [];
+  late final Computed<List<_AppCacheItem>> _filteredAppsComputed;
+
   Map<String, AppInfo> _systemAppsByPackage = {};
-
-  bool _loadingApps = true;
   late String _myPackage;
   StreamSubscription? _appChangesSub;
 
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   static const platform = MethodChannel('lock_channel');
 
   static const List<String> _clockPackageCandidates = [
@@ -144,6 +145,16 @@ class _LauncherUiState extends State<LauncherUi> {
 
     _appScrollController = ScrollController();
 
+    _filteredAppsComputed = computed(() {
+      final q = _searchQuerySignal.value;
+      if (q.isEmpty) return _appsSignal.value;
+
+      return _appsSignal.value.where((appCache) {
+        return appCache.normalizedName.contains(q) ||
+            appCache.normalizedPackage.contains(q);
+      }).toList();
+    });
+
     _updateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateTime();
@@ -169,12 +180,9 @@ class _LauncherUiState extends State<LauncherUi> {
       _processAppsList(allApps.cast<AppInfo>());
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _apps = [];
-        _filteredAppsCache = [];
-        _systemAppsByPackage = {};
-        _loadingApps = false;
-      });
+      _appsSignal.value = [];
+      _systemAppsByPackage = {};
+      _loadingAppsSignal.value = false;
     }
   }
 
@@ -194,12 +202,10 @@ class _LauncherUiState extends State<LauncherUi> {
     processedApps.sort((a, b) => a.normalizedName.compareTo(b.normalizedName));
 
     if (!mounted) return;
-    setState(() {
-      _apps = processedApps;
-      _filteredAppsCache = _getFilteredApps(_searchQuery);
-      _systemAppsByPackage = byPackage;
-      _loadingApps = false;
-    });
+
+    _systemAppsByPackage = byPackage;
+    _appsSignal.value = processedApps;
+    _loadingAppsSignal.value = false;
   }
 
   Future<bool> isDefaultLauncher() async {
@@ -299,8 +305,8 @@ class _LauncherUiState extends State<LauncherUi> {
     final minutes = now.minute.toString().padLeft(2, '0');
     final newTimeStr = '$hours:$minutes';
 
-    if (_timeNotifier.value != newTimeStr) {
-      _timeNotifier.value = newTimeStr;
+    if (_timeSignal.value != newTimeStr) {
+      _timeSignal.value = newTimeStr;
     }
   }
 
@@ -322,7 +328,7 @@ class _LauncherUiState extends State<LauncherUi> {
 
     final normalizedKeywords = keywords.map(_normalize).toList();
 
-    for (final appCache in _apps) {
+    for (final appCache in _appsSignal.value) {
       final matched = normalizedKeywords.any((k) {
         return appCache.normalizedName.contains(k) ||
             appCache.normalizedPackage.contains(k);
@@ -395,26 +401,12 @@ class _LauncherUiState extends State<LauncherUi> {
   }
 
   void _onSearchChanged(String value) {
-    _searchQuery = value;
-    setState(() {
-      _filteredAppsCache = _getFilteredApps(_searchQuery);
-    });
-  }
-
-  List<_AppCacheItem> _getFilteredApps(String query) {
-    final q = _normalize(query);
-    if (q.isEmpty) return _apps;
-
-    return _apps.where((appCache) {
-      return appCache.normalizedName.contains(q) ||
-          appCache.normalizedPackage.contains(q);
-    }).toList();
+    _searchQuerySignal.value = _normalize(value);
   }
 
   @override
   void dispose() {
     _timer.cancel();
-    _timeNotifier.dispose();
     _appScrollController.dispose();
     _appChangesSub?.cancel();
     _searchController.dispose();
@@ -531,19 +523,22 @@ class _LauncherUiState extends State<LauncherUi> {
               color: Colors.white.withValues(alpha: 0.7),
               size: 20,
             ),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    onPressed: () {
-                      _searchController.clear();
-                      _onSearchChanged('');
-                    },
-                    icon: Icon(
-                      Icons.close,
-                      color: Colors.white.withValues(alpha: 0.7),
-                      size: 18,
-                    ),
-                  )
-                : null,
+            suffixIcon: Watch((context) {
+              if (_searchQuerySignal.value.isNotEmpty) {
+                return IconButton(
+                  onPressed: () {
+                    _searchController.clear();
+                    _onSearchChanged('');
+                  },
+                  icon: Icon(
+                    Icons.close,
+                    color: Colors.white.withValues(alpha: 0.7),
+                    size: 18,
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            }),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
@@ -584,21 +579,18 @@ class _LauncherUiState extends State<LauncherUi> {
             alignment: Alignment.center,
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: ValueListenableBuilder<String>(
-                valueListenable: _timeNotifier,
-                builder: (context, timeString, child) {
-                  return Text(
-                    timeString,
-                    style: const TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 24,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      decoration: TextDecoration.none,
-                    ),
-                  );
-                },
-              ),
+              child: Watch((context) {
+                return Text(
+                  _timeSignal.value,
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 24,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.none,
+                  ),
+                );
+              }),
             ),
           ),
         ),
@@ -666,27 +658,33 @@ class _LauncherUiState extends State<LauncherUi> {
               thumbVisibility: true,
               thickness: 4,
               radius: const Radius.circular(20),
-              child: _loadingApps
-                  ? const SizedBox.shrink()
-                  : ListView.builder(
-                      controller: _appScrollController,
-                      physics: const ClampingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      itemCount: _filteredAppsCache.length,
-                      itemBuilder: (context, index) {
-                        final appCache = _filteredAppsCache[index];
+              child: Watch((context) {
+                if (_loadingAppsSignal.value) {
+                  return const SizedBox.shrink();
+                }
 
-                        if (appCache.app.appName != null &&
-                            appCache.app.packageName != null) {
-                          return AppItem(
-                            name: appCache.app.appName!,
-                            package: appCache.app.packageName!,
-                          );
-                        }
+                final filteredList = _filteredAppsComputed.value;
 
-                        return Container();
-                      },
-                    ),
+                return ListView.builder(
+                  controller: _appScrollController,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  itemCount: filteredList.length,
+                  itemBuilder: (context, index) {
+                    final appCache = filteredList[index];
+
+                    if (appCache.app.appName != null &&
+                        appCache.app.packageName != null) {
+                      return AppItem(
+                        name: appCache.app.appName!,
+                        package: appCache.app.packageName!,
+                      );
+                    }
+
+                    return const SizedBox.shrink();
+                  },
+                );
+              }),
             ),
           ),
         ),

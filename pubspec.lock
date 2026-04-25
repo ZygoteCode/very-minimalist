@@ -196,10 +196,10 @@ packages:
     dependency: transitive
     description:
       name: hooks
-      sha256: e79ed1e8e1929bc6ecb6ec85f0cb519c887aa5b423705ded0d0f2d9226def388
+      sha256: "025f060e86d2d4c3c47b56e33caf7f93bf9283340f26d23424ebcfccf34f621e"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.2"
+    version: "1.0.3"
   http:
     dependency: transitive
     description:
@@ -308,18 +308,18 @@ packages:
     dependency: "direct main"
     description:
       name: package_info_plus
-      sha256: c2a4a9404e578d7c69e3cf19f0b057d906bd0b073deedc8006db997a8bfe97ca
+      sha256: "4bf625947f6c7713ee242296a682e23e44823c09cf9d79e4f1238923c92db852"
       url: "https://pub.dev"
     source: hosted
-    version: "10.0.0"
+    version: "10.1.0"
   package_info_plus_platform_interface:
     dependency: transitive
     description:
       name: package_info_plus_platform_interface
-      sha256: "063b21cce7a2e3d902897d6cefc3bd211bb8ea42190698be72219cd5017f1c65"
+      sha256: db762cb2f4f25ee60fb6359773861b0f199e00b90d237bd85a76a1e806b46ef4
       url: "https://pub.dev"
     source: hosted
-    version: "4.0.0"
+    version: "4.1.0"
   path:
     dependency: transitive
     description:
@@ -352,6 +352,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.5.0"
+  preact_signals:
+    dependency: transitive
+    description:
+      name: preact_signals
+      sha256: ad45313c86b2228536a16d3dfc86da8263705d4acb4136c42907378de6910d8c
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.9.4"
   pub_semver:
     dependency: transitive
     description:
@@ -360,6 +368,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  record_use:
+    dependency: transitive
+    description:
+      name: record_use
+      sha256: "2551bd8eecfe95d14ae75f6021ad0248be5c27f138c2ec12fcb52b500b3ba1ed"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.0"
+  signals:
+    dependency: "direct main"
+    description:
+      name: signals
+      sha256: "0d644f4ec8ce4862c61e3d3d1168d08a7b9b6ecbe067d4f96e26dd35287f5dcd"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.0"
+  signals_core:
+    dependency: transitive
+    description:
+      name: signals_core
+      sha256: ea427bd53619e69e6f6cf244177e3b72870e433065c807600fb496fd80611c9f
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.2.1"
+  signals_flutter:
+    dependency: "direct main"
+    description:
+      name: signals_flutter
+      sha256: "7c83418f47e3538685217e583f0fbd17a29716fa1a9ce2247e2455786e8ea81a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.0"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -449,10 +489,10 @@ packages:
     dependency: transitive
     description:
       name: win32
-      sha256: "316d813e24518851c2682b1a57bc7e2e54e9c7b81493d48bef502fea0c17f841"
+      sha256: ba7d5750e3441caa1bbe31d9e516348fcf8dfcb32aa29ef87a844a59f4d1f1d0
       url: "https://pub.dev"
     source: hosted
-    version: "6.0.1"
+    version: "6.1.0"
   xml:
     dependency: transitive
     description:
@@ -471,4 +511,4 @@ packages:
     version: "3.1.3"
 sdks:
   dart: ">=3.11.4 <4.0.0"
-  flutter: ">=3.41.0"
+  flutter: ">=3.38.1"

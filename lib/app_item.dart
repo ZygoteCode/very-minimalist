@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_device_apps/flutter_device_apps.dart';
+import 'package:signals_flutter/signals_flutter.dart';
 
 class AppItem extends StatefulWidget {
   final String name;
@@ -13,8 +14,9 @@ class AppItem extends StatefulWidget {
 }
 
 class _AppItemState extends State<AppItem> {
-  bool _hovered = false;
-  bool _pressed = false;
+  final Signal<bool> _isHovered = signal(false);
+  final Signal<bool> _isPressed = signal(false);
+
   static const platform = MethodChannel('lock_channel');
 
   static const Color _pressedColor = Color(0x2EFFFFFF);
@@ -41,30 +43,18 @@ class _AppItemState extends State<AppItem> {
     fontFamily: 'SF Pro',
   );
 
-  void _setPressed(bool value) {
-    if (_pressed != value) {
-      setState(() => _pressed = value);
-    }
-  }
-
-  void _setHovered(bool value) {
-    if (_hovered != value) {
-      setState(() => _hovered = value);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: MouseRegion(
-        onEnter: (_) => _setHovered(true),
-        onExit: (_) => _setHovered(false),
+        onEnter: (_) => _isHovered.value = true,
+        onExit: (_) => _isHovered.value = false,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => _setPressed(true),
-          onTapUp: (_) => _setPressed(false),
-          onTapCancel: () => _setPressed(false),
-          onLongPress: () => _showContextMenu(context),
+          onTapDown: (_) => _isPressed.value = true,
+          onTapUp: (_) => _isPressed.value = false,
+          onTapCancel: () => _isPressed.value = false,
+          onLongPress: () async => await _showContextMenu(context),
           onTap: () async {
             try {
               await FlutterDeviceApps.openApp(widget.package);
@@ -72,81 +62,85 @@ class _AppItemState extends State<AppItem> {
               debugPrint('Error while opening app: $e');
             }
           },
-          child: AnimatedContainer(
-            duration: _animDuration,
-            curve: Curves.easeOut,
-            margin: _itemMargin,
-            padding: _itemPadding,
-            decoration: BoxDecoration(
-              color: _pressed
-                  ? _pressedColor
-                  : _hovered
-                  ? _hoverColor
-                  : _transparent,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.name,
-                    style: _textStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          child: Watch((context) {
+            return AnimatedContainer(
+              duration: _animDuration,
+              curve: Curves.easeOut,
+              margin: _itemMargin,
+              padding: _itemPadding,
+              decoration: BoxDecoration(
+                color: _isPressed.value
+                    ? _pressedColor
+                    : _isHovered.value
+                    ? _hoverColor
+                    : _transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.name,
+                      style: _textStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          }),
         ),
       ),
     );
   }
 
-  void _showContextMenu(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showContextMenu(BuildContext context) async {
+    await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       elevation: 0,
-      builder: (_) {
-        return RepaintBoundary(
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(24),
-              border: const Border.fromBorderSide(
-                BorderSide(color: _borderColor, width: 2),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        final bottomInset = MediaQuery.paddingOf(sheetContext).bottom;
+
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: bottomInset + 16,
+          ),
+          child: RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(24),
+                border: const Border.fromBorderSide(
+                  BorderSide(color: _borderColor, width: 2),
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: _shadowColor,
+                    blurRadius: 32,
+                    spreadRadius: 12,
+                  ),
+                ],
               ),
-              boxShadow: const [
-                BoxShadow(
-                  color: _shadowColor,
-                  blurRadius: 32,
-                  spreadRadius: 12,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildMenuItem(
-                  icon: Icons.info_outline,
-                  label: 'App info',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openAppInfo();
-                  },
-                ),
-                _buildMenuItem(
-                  icon: Icons.delete_outline,
-                  label: 'Uninstall app',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _uninstallApp();
-                  },
-                ),
-              ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildMenuItem(
+                    icon: Icons.info_outline,
+                    label: 'App info',
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await _openAppInfo();
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -180,14 +174,6 @@ class _AppItemState extends State<AppItem> {
       await platform.invokeMethod('openAppInfo', {'package': widget.package});
     } catch (e) {
       debugPrint('Error while getting app info: $e');
-    }
-  }
-
-  Future<void> _uninstallApp() async {
-    try {
-      await platform.invokeMethod('uninstallApp', {'package': widget.package});
-    } catch (e) {
-      debugPrint('Error while trying to uninstall app: $e');
     }
   }
 }

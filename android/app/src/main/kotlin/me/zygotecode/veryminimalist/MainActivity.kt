@@ -8,8 +8,6 @@ import android.provider.MediaStore
 import android.provider.AlarmClock
 import android.provider.Settings
 import android.net.Uri
-import android.view.View
-import android.os.Bundle
 import android.content.pm.PackageManager
 
 class MainActivity : FlutterActivity() {
@@ -71,16 +69,6 @@ class MainActivity : FlutterActivity() {
                         val packageName = call.argument<String>("package")
 
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                        intent.data = Uri.parse("package:$packageName")
-                        startActivity(intent)
-
-                        result.success(null)
-                    }
-
-                    "uninstallApp" -> {
-                        val packageName = call.argument<String>("package")
-
-                        val intent = Intent(Intent.ACTION_DELETE)
                         intent.data = Uri.parse("package:$packageName")
                         startActivity(intent)
 
